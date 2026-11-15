@@ -4,14 +4,15 @@ import {
 } from 'remotion';
 import { loadFont } from '@remotion/google-fonts/Montserrat';
 import { POINTS, PINNED, Point, Card } from './data';
+import { SEGS, STARTS, TOTAL as T, VO_LEAD } from './timing';
+import { useAudioData, visualizeAudio } from '@remotion/media-utils';
 
 const { fontFamily } = loadFont('normal', { weights: ['600', '700', '800', '900'], subsets: ['latin', 'latin-ext'] });
 const FONT = `${fontFamily}, Inter, sans-serif`;
 
-export const HOOK = 120;
-export const SEG = 156;
-export const CTA = 120;
-export const TOTAL = HOOK + SEG * POINTS.length + CTA; // 1800 = 60s
+export const HOOK = SEGS[0];
+export const CTA = SEGS[SEGS.length - 1];
+export const TOTAL = T;
 
 const RED = '#e01b24';
 const GREEN = '#21c55d';
@@ -140,14 +141,14 @@ const Counter: React.FC<{ to: number; prefix: string; suffix: string; color: str
 // ---------- scene styles ----------
 
 // A: split screen — infographic panel on top, presenter photo below.
-const SceneA: React.FC<{ p: Extract<Point, { style: 'A' }> }> = ({ p }) => {
+const SceneA: React.FC<{ p: Extract<Point, { style: 'A' }>; dur: number }> = ({ p, dur }) => {
   const f = useCurrentFrame();
   const bigS = spring({ frame: f - 6, fps: 30, config: { damping: 11, stiffness: 160 } });
   const color = TONE[p.bigTone];
   return (
     <AbsoluteFill style={{ background: '#000' }}>
       <div style={{ position: 'absolute', top: 860, left: 0, right: 0, bottom: 0 }}>
-        <Photo src={p.photo === 'desk' ? 'img/desk.jpg' : 'img/portrait.jpg'} dur={SEG} origin={p.photo === 'desk' ? '35% 55%' : '50% 30%'} from={p.photo === 'desk' ? 1.5 : 1.05} to={p.photo === 'desk' ? 1.62 : 1.15} />
+        <Photo src={p.photo === 'desk' ? 'img/desk.jpg' : 'img/portrait.jpg'} dur={dur} origin={p.photo === 'desk' ? '35% 55%' : '50% 30%'} from={p.photo === 'desk' ? 1.5 : 1.05} to={p.photo === 'desk' ? 1.62 : 1.15} />
         <AbsoluteFill style={{ background: 'linear-gradient(180deg, rgba(0,0,0,0) 45%, rgba(0,0,0,.85) 100%)' }} />
       </div>
       <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 860, overflow: 'hidden', background: 'radial-gradient(120% 90% at 50% 0%, #16233b 0%, #070b14 70%)' }}>
@@ -172,13 +173,13 @@ const SceneA: React.FC<{ p: Extract<Point, { style: 'A' }> }> = ({ p }) => {
         </div>
       </div>
       <div style={{ position: 'absolute', top: 856, left: 0, right: 0, height: 8, background: RED }} />
-      <Captions lines={p.captions} dur={SEG} />
+      <Captions lines={p.captions} dur={dur} />
     </AbsoluteFill>
   );
 };
 
 // B: off-white text card with red underlined keywords (reference "ground realities" style).
-const SceneB: React.FC<{ p: Extract<Point, { style: 'B' }> }> = ({ p }) => {
+const SceneB: React.FC<{ p: Extract<Point, { style: 'B' }>; dur: number }> = ({ p, dur }) => {
   const f = useCurrentFrame();
   return (
     <AbsoluteFill style={{ background: 'radial-gradient(90% 70% at 50% 40%, #f6f3ee 0%, #e2ddd5 100%)' }}>
@@ -208,7 +209,7 @@ const SceneB: React.FC<{ p: Extract<Point, { style: 'B' }> }> = ({ p }) => {
           );
         })}
       </div>
-      <Captions lines={p.captions} dur={SEG} light />
+      <Captions lines={p.captions} dur={dur} light />
     </AbsoluteFill>
   );
 };
@@ -231,7 +232,7 @@ const CardView: React.FC<{ c: Card; i: number; wide: boolean }> = ({ c, i, wide 
   );
 };
 
-const SceneC: React.FC<{ p: Extract<Point, { style: 'C' }> }> = ({ p }) => {
+const SceneC: React.FC<{ p: Extract<Point, { style: 'C' }>; dur: number }> = ({ p, dur }) => {
   const f = useCurrentFrame();
   const wide = p.cards.length === 3;
   const hs = spring({ frame: f - 4, fps: 30, config: { damping: 13 } });
@@ -244,7 +245,7 @@ const SceneC: React.FC<{ p: Extract<Point, { style: 'C' }> }> = ({ p }) => {
       <div style={{ position: 'absolute', top: 530, left: 0, right: 0, display: 'flex', flexWrap: 'wrap', justifyContent: 'center', gap: wide ? 24 : 20 }}>
         {p.cards.map((c, i) => <CardView key={i} c={c} i={i} wide={wide} />)}
       </div>
-      <Captions lines={p.captions} dur={SEG} />
+      <Captions lines={p.captions} dur={dur} />
     </AbsoluteFill>
   );
 };
@@ -279,7 +280,7 @@ const Hook: React.FC = () => {
         </div>
       </div>
       <AbsoluteFill style={{ background: '#fff', opacity: flash }} />
-      <Captions lines={['FED, *crude*, FII, IPO…', 'Sab ek reel mein — *end tak dekhna!*']} dur={HOOK} />
+      <Captions lines={['*Ruko!* Scroll mat karna...', 'Ye *10 triggers* market ko hila sakte hain!']} dur={HOOK} />
     </AbsoluteFill>
   );
 };
@@ -309,6 +310,25 @@ const Outro: React.FC = () => {
   );
 };
 
+// Voice-reactive equalizer pill: shows the presenter is speaking.
+const VoiceBars: React.FC<{ i: number }> = ({ i }) => {
+  const f = useCurrentFrame();
+  const { fps } = useVideoConfig();
+  const src = staticFile(`audio/vo/l${i}.wav`);
+  const data = useAudioData(src);
+  const vals = data && f >= VO_LEAD
+    ? visualizeAudio({ fps, frame: f - VO_LEAD, audioData: data, numberOfSamples: 16 }).slice(1, 10)
+    : new Array(9).fill(0);
+  return (
+    <div style={{ position: 'absolute', top: 72, right: 50, height: 62, display: 'flex', alignItems: 'center', gap: 6, background: 'rgba(0,0,0,.75)', padding: '0 18px', borderRadius: 31, zIndex: 25 }}>
+      <div style={{ width: 14, height: 14, borderRadius: 7, background: RED, marginRight: 6 }} />
+      {vals.map((v: number, k: number) => (
+        <div key={k} style={{ width: 7, borderRadius: 4, background: '#fff', height: 6 + Math.min(38, Math.sqrt(v) * 110) }} />
+      ))}
+    </div>
+  );
+};
+
 // ---------- timeline ----------
 
 const Enter: React.FC<{ children: React.ReactNode; dir: number }> = ({ children, dir }) => {
@@ -323,30 +343,33 @@ export const Reel: React.FC<{ bgm?: boolean }> = ({ bgm = true }) => {
   const { durationInFrames } = useVideoConfig();
   return (
     <AbsoluteFill style={{ background: '#000' }}>
-      <Sequence durationInFrames={HOOK}><Hook /></Sequence>
+      <Sequence durationInFrames={HOOK}><Hook /><VoiceBars i={0} /></Sequence>
       {POINTS.map((p, i) => (
-        <Sequence key={p.n} from={HOOK + i * SEG} durationInFrames={SEG}>
+        <Sequence key={p.n} from={STARTS[i + 1]} durationInFrames={SEGS[i + 1]}>
           <Enter dir={i % 2 ? -1 : 1}>
-            {p.style === 'A' ? <SceneA p={p} /> : p.style === 'B' ? <SceneB p={p} /> : <SceneC p={p} />}
+            {p.style === 'A' ? <SceneA p={p} dur={SEGS[i + 1]} /> : p.style === 'B' ? <SceneB p={p} dur={SEGS[i + 1]} /> : <SceneC p={p} dur={SEGS[i + 1]} />}
+            <VoiceBars i={i + 1} />
             <Progress n={p.n} />
             <Badge n={p.n} label={p.label} />
           </Enter>
         </Sequence>
       ))}
-      <Sequence from={HOOK + POINTS.length * SEG} durationInFrames={CTA}><Enter dir={1}><Outro /></Enter></Sequence>
+      <Sequence from={STARTS[SEGS.length - 1]} durationInFrames={CTA}><Enter dir={1}><Outro /><VoiceBars i={SEGS.length - 1} /></Enter></Sequence>
 
       {bgm && (
         <Audio src={staticFile('audio/bgm.mp3')}
-          volume={(f) => interpolate(f, [0, 15, durationInFrames - 45, durationInFrames], [0, 0.55, 0.55, 0], clamp)} />
+          volume={(f) => interpolate(f, [0, 15, durationInFrames - 45, durationInFrames], [0, 0.16, 0.16, 0], clamp)} />
       )}
-      <Sequence from={10}><Audio src={staticFile('audio/impact-cine.mp3')} volume={0.55} /></Sequence>
+      <Sequence from={10}><Audio src={staticFile('audio/impact-cine.mp3')} volume={0.3} /></Sequence>
       {POINTS.map((p, i) => (
-        <Sequence key={p.n} from={HOOK + i * SEG - 3} durationInFrames={30}>
+        <Sequence key={p.n} from={STARTS[i + 1] - 3} durationInFrames={30}>
           <Audio src={staticFile(i % 2 ? 'audio/swoosh-quick.mp3' : 'audio/whoosh-fast.mp3')} volume={0.4} />
         </Sequence>
       ))}
-      <Sequence from={HOOK + POINTS.length * SEG - 3} durationInFrames={30}><Audio src={staticFile('audio/transition-snap.mp3')} volume={0.45} /></Sequence>
-      <Sequence from={HOOK + POINTS.length * SEG + 20}><Audio src={staticFile('audio/impact-cine.mp3')} volume={0.4} /></Sequence>
+      <Sequence from={STARTS[SEGS.length - 1] - 3} durationInFrames={30}><Audio src={staticFile('audio/transition-snap.mp3')} volume={0.45} /></Sequence>
+      {SEGS.map((_, i) => (
+        <Sequence key={'vo' + i} from={STARTS[i] + VO_LEAD}><Audio src={staticFile(`audio/vo/l${i}.wav`)} volume={1} /></Sequence>
+      ))}
     </AbsoluteFill>
   );
 };
